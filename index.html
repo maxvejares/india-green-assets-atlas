@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>India Green Assets Atlas</title>
+
+<!-- Leaflet -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- Leaflet.markercluster -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+
+<style>
+/* ── Reset & base ─────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; font-family: 'Segoe UI', Arial, sans-serif; background: #f4f6f9; color: #1a2332; }
+
+/* ── Layout ─────────────────────────────────────────────── */
+#app { display: flex; flex-direction: column; height: 100vh; }
+
+/* ── Header ─────────────────────────────────────────────── */
+#header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 20px; height: 54px; flex-shrink: 0;
+  background: linear-gradient(135deg, #1a5c40 0%, #1e7a52 60%, #27a366 100%);
+  border-bottom: 1px solid #16a34a;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+  z-index: 1000;
+}
+#header-left { display: flex; align-items: center; gap: 14px; }
+#header-flag { font-size: 22px; line-height: 1; }
+#header-title { font-size: 16px; font-weight: 700; letter-spacing: 0.03em; color: #ffffff; }
+#header-subtitle { font-size: 11px; color: #a7f3d0; letter-spacing: 0.02em; margin-top: 1px; }
+#header-badge {
+  background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.35);
+  color: #fff; font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: 20px;
+  letter-spacing: 0.04em; text-transform: uppercase;
+}
+#header-stats { display: flex; gap: 20px; }
+.hstat { text-align: center; }
+.hstat-val { font-size: 18px; font-weight: 700; color: #ffffff; line-height: 1; }
+.hstat-lbl { font-size: 9px; color: #a7f3d0; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 1px; }
+
+/* ── Main area ───────────────────────────────────────────── */
+#main { display: flex; flex: 1; overflow: hidden; }
+
+/* ── Sidebar ─────────────────────────────────────────────── */
+#sidebar {
+  width: 300px; flex-shrink: 0;
+  background: #ffffff;
+  border-right: 1px solid #e2e8f0;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  box-shadow: 2px 0 8px rgba(0,0,0,0.06);
+}
+#sidebar-inner { flex: 1; overflow-y: auto; padding: 14px 12px; }
+#sidebar-inner::-webkit-scrollbar { width: 5px; }
+#sidebar-inner::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+
+.section-label {
+  font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;
+  color: #94a3b8; margin-bottom: 8px; margin-top: 14px; padding-bottom: 4px;
+  border-bottom: 1px solid #e2e8f0;
+}
+.section-label:first-child { margin-top: 2px; }
+
+/* Legend rows (in sidebar dynamic legend) */
+.legend-row { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; font-size: 11px; color: #475569; }
+.legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+/* ── Sidebar dropdowns ───────────────────────────────────── */
+.control-group { margin-bottom: 10px; }
+.control-group label {
+  display: block; font-size: 9px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.1em; color: #94a3b8; margin-bottom: 5px;
+}
+.control-group select {
+  width: 100%; padding: 7px 10px; border: 1px solid #e2e8f0; border-radius: 8px;
+  background: #f8fafc; color: #1e293b; font-size: 12px; font-family: inherit;
+  cursor: pointer; outline: none; appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 10px center;
+  padding-right: 30px;
+  transition: border-color .15s, box-shadow .15s;
+}
+.control-group select:hover { border-color: #94a3b8; }
+.control-group select:focus { border-color: #16a34a; box-shadow: 0 0 0 3px rgba(22,163,74,0.12); }
+
+
+/* ── Map ─────────────────────────────────────────────────── */
+#map-wrap { flex: 1; position: relative; }
+#map { width: 100%; height: 100%; }
+
+/* ── Search bar ─────────────────────────────────────────── */
+#search-bar {
+  position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+  z-index: 800; background: rgba(255,255,255,0.96); border: 1px solid #cbd5e1;
+  border-radius: 24px; display: flex; align-items: center; gap: 8px;
+  padding: 6px 14px; width: 340px; box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  backdrop-filter: blur(8px);
+}
+#search-bar input {
+  background: transparent; border: none; outline: none; color: #1e293b;
+  font-size: 13px; flex: 1;
+}
+#search-bar input::placeholder { color: #94a3b8; }
+#search-icon { color: #94a3b8; font-size: 14px; }
+#search-results {
+  position: absolute; top: 46px; left: 50%; transform: translateX(-50%);
+  width: 340px; z-index: 800; background: rgba(255,255,255,0.98);
+  border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12); max-height: 220px; overflow-y: auto; display: none;
+}
+.search-item {
+  padding: 8px 14px; font-size: 12px; cursor: pointer; border-bottom: 1px solid #f1f5f9;
+  color: #1e293b;
+}
+.search-item:last-child { border-bottom: none; }
+.search-item:hover { background: #f8fafc; }
+.search-sector { font-size: 10px; color: #94a3b8; margin-top: 1px; }
+
+/* ── Map attribution override ─────────────────────────────── */
+.leaflet-control-attribution { background: rgba(255,255,255,0.85) !important; color: #94a3b8 !important; font-size: 9px !important; }
+.leaflet-control-attribution a { color: #16a34a !important; }
+
+/* ── Popup ─────────────────────────────────────────────────── */
+.custom-popup .leaflet-popup-content-wrapper {
+  background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.15); color: #1e293b; padding: 0;
+}
+.custom-popup .leaflet-popup-tip { background: #ffffff; }
+.custom-popup .leaflet-popup-content { margin: 0; min-width: 240px; max-width: 300px; }
+
+.popup-body { padding: 14px 16px 12px; }
+.popup-sector-tag {
+  display: inline-block; font-size: 9px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.08em; padding: 2px 7px; border-radius: 20px; margin-bottom: 7px;
+}
+.popup-company { font-size: 14px; font-weight: 700; color: #0f172a; line-height: 1.3; margin-bottom: 4px; }
+.popup-location { font-size: 11px; color: #16a34a; margin-bottom: 10px; font-weight: 500; }
+.popup-divider { border: none; border-top: 1px solid #f1f5f9; margin: 8px 0; }
+.popup-row { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 11px; }
+.popup-lbl { color: #94a3b8; }
+.popup-val { color: #1e293b; font-weight: 500; max-width: 160px; text-align: right; }
+.popup-note { font-size: 10px; color: #94a3b8; margin-top: 8px; line-height: 1.5; font-style: italic; }
+.popup-status {
+  display: inline-block; font-size: 9px; font-weight: 600; padding: 1px 6px; border-radius: 20px;
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+
+/* ── Map controls ─────────────────────────────────────────── */
+.leaflet-control-zoom { border: 1px solid #e2e8f0 !important; border-radius: 8px !important; overflow: hidden; box-shadow: 0 2px 6px rgba(0,0,0,0.1) !important; }
+.leaflet-control-zoom a { background: #ffffff !important; color: #475569 !important; border-color: #e2e8f0 !important; }
+.leaflet-control-zoom a:hover { background: #f8fafc !important; color: #0f172a !important; }
+
+
+/* ── Info panel (bottom summary) ────────────────────────── */
+#info-panel {
+  position: absolute; bottom: 28px; left: 16px; z-index: 800;
+  background: rgba(255,255,255,0.95); border: 1px solid #e2e8f0; border-radius: 10px;
+  padding: 10px 14px; font-size: 11px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+  min-width: 180px;
+}
+#info-panel-title { font-size: 9px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 700; margin-bottom: 8px; }
+#info-panel-content .ip-row { display: flex; gap: 8px; align-items: center; margin-bottom: 5px; }
+#info-panel-content .ip-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+#info-panel-content .ip-lbl { color: #475569; flex: 1; font-size: 11px; }
+#info-panel-content .ip-cnt { font-weight: 700; color: #0f172a; font-size: 11px; min-width: 24px; text-align: right; }
+
+/* ── Tooltip ─────────────────────────────────────────────── */
+.leaflet-tooltip {
+  background: rgba(255,255,255,0.97) !important; border: 1px solid #e2e8f0 !important;
+  border-radius: 6px !important; color: #1e293b !important; font-size: 11px !important;
+  padding: 4px 9px !important; font-family: 'Segoe UI', Arial, sans-serif !important;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.12) !important;
+}
+.leaflet-tooltip::before { display: none !important; }
+
+
+/* ── Cluster icons ─────────────────────────────────────── */
+.marker-cluster-small, .marker-cluster-medium, .marker-cluster-large {
+  background-color: rgba(22,163,74,0.15) !important;
+}
+.marker-cluster-small div, .marker-cluster-medium div, .marker-cluster-large div {
+  background-color: rgba(22,163,74,0.75) !important;
+  color: #fff !important; font-weight: 700 !important; font-size: 12px !important;
+}
+
+/* ── View toggle ────────────────────────────────────────── */
+#view-toggle {
+  position: absolute; bottom: 28px; right: 16px; z-index: 800;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.vtbtn {
+  background: rgba(255,255,255,0.95); border: 1px solid #e2e8f0; border-radius: 8px;
+  color: #64748b; font-size: 11px; padding: 7px 12px; cursor: pointer;
+  transition: all .15s; white-space: nowrap; text-align: center;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+.vtbtn:hover { background: #f8fafc; color: #1e293b; border-color: #94a3b8; }
+.vtbtn.active { background: #16a34a; border-color: #16a34a; color: #ffffff; }
+</style>
+</head>
+<body>
+
+<div id="app">
+
+<!-- HEADER -->
+<div id="header">
+  <div id="header-left">
+    <div id="header-flag">🇮🇳</div>
+    <div>
+      <div id="header-title">India Green Assets Atlas</div>
+      <div id="header-subtitle">Green Industrial Assets · 6 Sectors · 2026</div>
+    </div>
+    <div id="header-badge">Demo</div>
+  </div>
+  <div id="header-stats">
+    <div class="hstat"><div class="hstat-val" id="hs-records">—</div><div class="hstat-lbl">Records</div></div>
+    <div class="hstat"><div class="hstat-val" id="hs-mapped">—</div><div class="hstat-lbl">Mapped</div></div>
+    <div class="hstat"><div class="hstat-val" id="hs-sectors">6</div><div class="hstat-lbl">Sectors</div></div>
+    <div class="hstat"><div class="hstat-val" id="hs-states">—</div><div class="hstat-lbl">States</div></div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+
+  <!-- SIDEBAR -->
+  <div id="sidebar">
+    <div id="sidebar-inner">
+
+      <!-- Layer -->
+      <div class="control-group">
+        <label for="layer-select">Layer</label>
+        <select id="layer-select" onchange="setActiveLayer(this.value)">
+          <option value="solar">☀️ Solar Manufacturing</option>
+          <option value="hydrogen">⚗️ Green Hydrogen</option>
+          <option value="evs">⚡ Electric Vehicles</option>
+          <option value="wind">🌬️ Wind Energy</option>
+          <option value="battery">🔋 Battery Storage</option>
+          <option value="steel">🏭 Green Steel</option>
+          <option value="all">🌐 All Sectors</option>
+        </select>
+      </div>
+
+      <!-- Status filter -->
+      <div class="control-group">
+        <label for="status-select">Status</label>
+        <select id="status-select" onchange="setStatusFilter(this.value)">
+          <option value="all">All Status</option>
+          <option value="Operational">Operational</option>
+          <option value="Announced">Announced</option>
+          <option value="Under Construction">Under Construction</option>
+          <option value="Planned">Planned</option>
+          <option value="Unknown">Unknown</option>
+        </select>
+      </div>
+
+      <!-- Record count -->
+      <div class="control-group" style="border-top:1px solid #e2e8f0;padding-top:12px;margin-top:4px">
+        <div style="font-size:11px;color:#94a3b8">
+          Showing <strong id="record-count" style="color:#1e293b">—</strong> records
+        </div>
+      </div>
+
+      <!-- Legend: Points -->
+      <div class="section-label" style="margin-top:16px">Point Markers</div>
+      <div id="legend-points"></div>
+
+      <!-- Legend: State heatmap -->
+      <div class="section-label" style="margin-top:14px">State Heatmap</div>
+      <div id="legend-states"></div>
+
+    </div><!-- /sidebar-inner -->
+  </div><!-- /sidebar -->
+
+  <!-- MAP -->
+  <div id="map-wrap">
+    <div id="map"></div>
+
+    <!-- Search -->
+    <div id="search-bar">
+      <span id="search-icon">🔍</span>
+      <input type="text" id="search-input" placeholder="Search companies, states, cities…" autocomplete="off" />
+    </div>
+    <div id="search-results"></div>
+
+    <!-- Legend panel -->
+    <div id="info-panel">
+      <div id="info-panel-title">Sectors</div>
+      <div id="info-panel-content"></div>
+    </div>
+
+    <!-- View toggle -->
+    <div id="view-toggle">
+      <div class="vtbtn" id="vt-points"     onclick="setDisplayMode('points')">Points only</div>
+      <div class="vtbtn" id="vt-choropleth" onclick="setDisplayMode('choropleth')">States only</div>
+    </div>
+
+  </div><!-- /map-wrap -->
+</div><!-- /main -->
+</div><!-- /app -->
+
+<!-- DATA -->
+<script src="india_embedded_data.js"></script>
+<script src="india_state_counts.js"></script>
+<script src="india_states_embedded.js"></script>
+<script src="india_outline_embedded.js"></script>
+
+<script>
+// ────────────────────────────────────────────────────────────────────────────
+// CONFIG
+// ────────────────────────────────────────────────────────────────────────────
+
+const LAYER_CFG = {
+  solar:    { label: 'Solar Manufacturing', key: 'solar',    color: '#F59E0B', icon: '☀️', data: null },
+  hydrogen: { label: 'Green Hydrogen',       key: 'hydrogen', color: '#06B6D4', icon: '⚗️', data: null },
+  evs:      { label: 'Electric Vehicles',    key: 'evs',      color: '#10B981', icon: '⚡', data: null },
+  wind:     { label: 'Wind Energy',          key: 'wind',     color: '#8B5CF6', icon: '🌬️', data: null },
+  battery:  { label: 'Battery Storage',      key: 'battery',  color: '#F97316', icon: '🔋', data: null },
+  steel:    { label: 'Green Steel',          key: 'steel',    color: '#EF4444', icon: '🏭', data: null },
+};
+
+const STATUS_COLORS = {
+  'Operational':        '#22C55E',
+  'Announced':          '#FBBF24',
+  'Under Construction': '#F97316',
+  'Planned':            '#A78BFA',
+  'Closed':             '#EF4444',
+  'Unknown':            '#6B7280',
+};
+
+const EV_SIZES   = { '2-Wheeler':14,'3-Wheeler':11,'4-Wheeler/Car':10,'Bus/Commercial':16,'Battery Pack/Component':9,'Other':9 };
+const EV_COLORS  = { '2-Wheeler':'#10B981','3-Wheeler':'#34D399','4-Wheeler/Car':'#6EE7B7','Bus/Commercial':'#059669','Battery Pack/Component':'#047857','Other':'#6B7280' };
+
+// ── Choropleth colour ramps (light → dark, 5 steps) ──────────────────────
+const CHORO_RAMPS = {
+  solar:    ['#FEF9C3','#FDE68A','#FCD34D','#F59E0B','#B45309'],
+  hydrogen: ['#CFFAFE','#A5F3FC','#22D3EE','#0891B2','#164E63'],
+  evs:      ['#D1FAE5','#6EE7B7','#34D399','#10B981','#065F46'],
+  wind:     ['#EDE9FE','#C4B5FD','#A78BFA','#7C3AED','#4C1D95'],
+  battery:  ['#FFEDD5','#FED7AA','#FB923C','#F97316','#C2410C'],
+  steel:    ['#FEE2E2','#FCA5A5','#F87171','#EF4444','#991B1B'],
+};
+
+// ────────────────────────────────────────────────────────────────────────────
+// STATE
+// ────────────────────────────────────────────────────────────────────────────
+
+let map, indiaGeoJSON = null, indiaOfficialBorder = null;
+// 'both' | 'points' | 'choropleth'
+let displayMode = 'both';
+// activeLayerKey: key of selected sector, or 'all'
+let activeLayerKey = 'solar';
+// point layers
+let pointLayers = {};
+// choropleth layers (one per sector)
+let choroLayers = {};
+let statusFilter = 'all';
+let allRecords = [];
+// which layer drives the choropleth
+let activeChoroKey = 'solar';
+
+// ────────────────────────────────────────────────────────────────────────────
+// INIT
+// ────────────────────────────────────────────────────────────────────────────
+
+document.addEventListener('DOMContentLoaded', () => {
+  LAYER_CFG.solar.data    = RAW_SOLAR;
+  LAYER_CFG.hydrogen.data = RAW_HYDROGEN;
+  LAYER_CFG.evs.data      = RAW_EVS;
+  LAYER_CFG.wind.data     = RAW_WIND;
+  LAYER_CFG.battery.data  = RAW_BATTERY;
+  LAYER_CFG.steel.data    = RAW_GREEN_STEEL;
+
+  allRecords = [...RAW_SOLAR,...RAW_HYDROGEN,...RAW_EVS,...RAW_WIND,...RAW_BATTERY,...RAW_GREEN_STEEL];
+
+  map = L.map('map', { center:[22,80], zoom:5, zoomControl:true, preferCanvas:true });
+
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+    attribution:'Tiles &copy; <a href="https://www.esri.com/">Esri</a> &mdash; Esri, DeLorme, HERE',
+    maxZoom:16,
+  }).addTo(map);
+
+  // Official India territory fill (Survey of India derived — includes POK + Aksai Chin)
+  // Drawn first so state choropleth sits on top; fills disputed areas with neutral color
+  L.geoJSON(INDIA_OUTLINE_GEOJSON, {
+    style: { fillColor: '#f1f5f9', fillOpacity: 1, color: 'none', weight: 0 }
+  }).addTo(map);
+
+  // Use embedded GeoJSON (avoids fetch() restriction on file:// URLs)
+  indiaGeoJSON = INDIA_STATES_GEOJSON;
+  buildAll();
+  updateHeaderStats();
+  updateInfoPanel();
+  updateLegend();
+
+  // Official India border line (drawn on top of all layers)
+  indiaOfficialBorder = L.geoJSON(INDIA_OUTLINE_GEOJSON, {
+    style: { fill: false, color: '#64748b', weight: 1.8, opacity: 0.9 }
+  }).addTo(map);
+  indiaOfficialBorder.bringToFront();
+
+  initSearch();
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// BUILD ALL LAYERS
+// ────────────────────────────────────────────────────────────────────────────
+
+function buildAll() {
+  // Remove existing
+  Object.values(pointLayers).forEach(l => { if (map.hasLayer(l)) map.removeLayer(l); });
+  Object.values(choroLayers).forEach(l => { if (map.hasLayer(l)) map.removeLayer(l); });
+  pointLayers = {};
+  choroLayers = {};
+
+  Object.keys(LAYER_CFG).forEach(k => {
+    pointLayers[k]  = buildPointLayer(k);
+    choroLayers[k]  = buildChoroLayer(k);
+  });
+
+  applyVisibility();
+  updateVisible();
+  // Keep official border line on top after rebuilding layers
+  if (indiaOfficialBorder) indiaOfficialBorder.bringToFront();
+}
+
+// ── Point layer ──────────────────────────────────────────────────────────────
+function buildPointLayer(key) {
+  const cfg = LAYER_CFG[key];
+  const records = cfg.data.filter(r =>
+    r.latitude && r.longitude &&
+    (statusFilter === 'all' || r.status === statusFilter)
+  );
+
+  const group = L.markerClusterGroup({
+    maxClusterRadius: 50,
+    iconCreateFunction: cl => clusterIcon(cl, cfg.color),
+    spiderfyOnMaxZoom: true,
+    showCoverageOnHover: false,
+    disableClusteringAtZoom: 9,
+  });
+
+  records.forEach(r => group.addLayer(makeMarker(r, key, cfg)));
+  return group;
+}
+
+// ── Choropleth layer ─────────────────────────────────────────────────────────
+function buildChoroLayer(key) {
+  if (!indiaGeoJSON) return L.featureGroup();
+  const cfg   = LAYER_CFG[key];
+  const counts = STATE_COUNTS[key] || {};
+  const maxVal = STATE_MAX[key] || 1;
+  const ramp   = CHORO_RAMPS[key];
+
+  function getColor(val) {
+    if (!val) return '#F1F5F9';
+    const t = Math.min(val / maxVal, 1);
+    const idx = Math.floor(t * (ramp.length - 1));
+    return ramp[Math.min(idx, ramp.length - 1)];
+  }
+
+  const layer = L.geoJSON(indiaGeoJSON, {
+    style: feat => {
+      const name = feat.properties.name;
+      const val  = counts[name] || 0;
+      return {
+        fillColor:   getColor(val),
+        fillOpacity: val ? 0.78 : 0.18,
+        color:       '#94A3B8',
+        weight:      0.8,
+        opacity:     0.7,
+      };
+    },
+    onEachFeature: (feat, lyr) => {
+      const name = feat.properties.name;
+      const val  = counts[name] || 0;
+      lyr.bindTooltip(
+        `<strong>${name}</strong><br>${val} ${cfg.label} asset${val !== 1 ? 's' : ''}`,
+        { sticky: true, direction: 'top' }
+      );
+      lyr.on('click', () => showStatePopup(name, key, cfg, counts[name] || 0));
+    },
+  });
+
+  return layer;
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// VISIBILITY LOGIC
+// ────────────────────────────────────────────────────────────────────────────
+
+function applyVisibility() {
+  const showPoints = displayMode === 'points' || displayMode === 'both';
+  const showChoro  = displayMode === 'choropleth' || displayMode === 'both';
+
+  Object.keys(LAYER_CFG).forEach(k => {
+    const sectorVisible = (activeLayerKey === 'all' || activeLayerKey === k);
+    const wantPoint = showPoints && sectorVisible;
+    const wantChoro = showChoro  && (k === activeChoroKey);
+
+    const pl = pointLayers[k];
+    const cl = choroLayers[k];
+    if (pl) { wantPoint ? pl.addTo(map) : map.removeLayer(pl); }
+    if (cl) { wantChoro ? cl.addTo(map) : map.removeLayer(cl); }
+  });
+  // Keep official border on top; no bringToBack on choropleth (would hide it behind territory fill)
+  if (indiaOfficialBorder) indiaOfficialBorder.bringToFront();
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// MARKERS
+// ────────────────────────────────────────────────────────────────────────────
+
+function clusterIcon(cluster, color) {
+  const n  = cluster.getChildCount();
+  const sz = n > 100 ? 42 : n > 20 ? 36 : 30;
+  return L.divIcon({
+    html:`<div style="width:${sz}px;height:${sz}px;border-radius:50%;background:${color}cc;border:2px solid ${color};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:${sz>36?13:11}px;box-shadow:0 2px 10px ${color}66">${n}</div>`,
+    className:'', iconSize:[sz,sz], iconAnchor:[sz/2,sz/2],
+  });
+}
+
+function makeMarker(r, key, cfg) {
+  let color = cfg.color, radius = 7;
+  if (key==='solar')    { color=STATUS_COLORS[r.status]||'#6B7280'; radius=r.capacity?Math.min(5+r.capacity*2,16):7; }
+  else if (key==='hydrogen') { color=STATUS_COLORS[r.status]||'#06B6D4'; }
+  else if (key==='evs') { const at=r.asset_type||'Other'; color=EV_COLORS[at]||'#6B7280'; radius=(EV_SIZES[at]||9)/2; }
+  else if (key==='wind'){ const at=(r.asset_type||'').toLowerCase(); color=at.includes('nacelle')?'#8B5CF6':at.includes('blade')||at.includes('tower')?'#A78BFA':'#C4B5FD'; radius=r.capacity?Math.min(5+r.capacity/300,12):7; }
+  else if (key==='battery'){ const at=(r.asset_type||'').toLowerCase(); color=at.includes('lithium')||at.includes('li-ion')?'#F97316':at.includes('lead')?'#FB923C':'#FED7AA'; }
+  else if (key==='steel'){ color='#EF4444'; radius=r.capacity?Math.min(7+r.capacity*0.4,18):8; }
+
+  const m = L.circleMarker([r.latitude,r.longitude],{radius,fillColor:color,color:'#fff',weight:1.5,opacity:0.9,fillOpacity:0.88});
+  m.bindTooltip(`<strong>${r.company}</strong><br>${[r.city,r.state].filter(Boolean).join(', ')}`,{direction:'top',offset:[0,-4]});
+  m.on('click', () => showPopup(r, key, cfg));
+  return m;
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// POPUPS
+// ────────────────────────────────────────────────────────────────────────────
+
+function showPopup(r, key, cfg) {
+  const status = r.status||'Unknown';
+  const sc = STATUS_COLORS[status]||'#6B7280';
+  const loc = [r.city,r.state].filter(Boolean).join(', ')||'Location not specified';
+  let rows='';
+  const row=(l,v)=>{ if(v!=null&&v!==''&&v!=='null') rows+=`<div class="popup-row"><span class="popup-lbl">${l}</span><span class="popup-val">${v}</span></div>`; };
+  row('Asset type', r.asset_type||r.asset_type_original);
+  row('Status', `<span class="popup-status" style="background:${sc}22;color:${sc}">${status}</span>`);
+  if(r.capacity)          row('Capacity',   `${r.capacity} ${r.capacity_units||''}`);
+  if(r.operational_date)  row('Operational', r.operational_date);
+  if(r.capital_investment)row('Investment',  r.capital_investment);
+  if(r.fdi_source_country)row('FDI source',  r.fdi_source_country);
+  if(r.direct_employment) row('Employment',  `${Number(r.direct_employment).toLocaleString()} jobs`);
+  const note = r.notes?`<div class="popup-note">${r.notes.replace(/\[Announcement year.*?\]/g,'').trim().slice(0,180)}${r.notes.length>180?'…':''}</div>`:'';
+  L.popup({className:'custom-popup',maxWidth:300,closeButton:true})
+    .setLatLng([r.latitude,r.longitude])
+    .setContent(`<div class="popup-body">
+      <div class="popup-sector-tag" style="background:${cfg.color}22;color:${cfg.color}">${cfg.icon} ${cfg.label}</div>
+      <div class="popup-company">${r.company}</div>
+      <div class="popup-location">📍 ${loc}</div>
+      ${rows?`<hr class="popup-divider">${rows}`:''}
+      ${note}
+      ${r.geocode_note?`<div class="popup-note" style="color:#F97316">⚠ ${r.geocode_note}</div>`:''}
+    </div>`)
+    .openOn(map);
+}
+
+function showStatePopup(stateName, key, cfg, count) {
+  const stateRecs = cfg.data.filter(r => {
+    const s = r.state;
+    if (!s) return false;
+    // normalise for display
+    const norm = s==='Odisha'?'Orissa':s==='Uttarakhand'?'Uttaranchal':s;
+    return norm === stateName;
+  });
+  const center = getStateCentroid(stateName);
+  if (!center) return;
+
+  let list = stateRecs.slice(0,8).map(r=>`<div style="font-size:11px;padding:2px 0;border-bottom:1px solid #f1f5f9;color:#1e293b">${r.company}${r.city?` <span style="color:#94a3b8">· ${r.city}</span>`:''}</div>`).join('');
+  if (stateRecs.length > 8) list += `<div style="font-size:10px;color:#94a3b8;margin-top:4px">+ ${stateRecs.length-8} more</div>`;
+
+  L.popup({className:'custom-popup',maxWidth:280,closeButton:true})
+    .setLatLng(center)
+    .setContent(`<div class="popup-body">
+      <div class="popup-sector-tag" style="background:${cfg.color}22;color:${cfg.color}">${cfg.icon} ${cfg.label}</div>
+      <div class="popup-company">${stateName}</div>
+      <div class="popup-location">📍 ${count} asset${count!==1?'s':''} in this state</div>
+      <hr class="popup-divider">${list}
+    </div>`)
+    .openOn(map);
+}
+
+function getStateCentroid(name) {
+  if (!indiaGeoJSON) return null;
+  const feat = indiaGeoJSON.features.find(f => f.properties.name === name);
+  if (!feat) return null;
+  try {
+    const coords = feat.geometry.coordinates;
+    let lats=[],lons=[];
+    const collect = arr => {
+      if (typeof arr[0]==='number') { lons.push(arr[0]); lats.push(arr[1]); }
+      else arr.forEach(collect);
+    };
+    collect(coords);
+    return [lats.reduce((a,b)=>a+b,0)/lats.length, lons.reduce((a,b)=>a+b,0)/lons.length];
+  } catch(e) { return null; }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// TOGGLE / FILTER / VIEW
+// ────────────────────────────────────────────────────────────────────────────
+
+function setActiveLayer(key) {
+  activeLayerKey = key;
+  if (key !== 'all') activeChoroKey = key;
+  applyVisibility();
+  updateVisible();
+  updateInfoPanel();
+  updateLegend();
+}
+
+function setDisplayMode(mode) {
+  displayMode = mode;
+  ['points','choropleth'].forEach(m => {
+    document.getElementById(`vt-${m}`).classList.toggle('active', m === mode);
+  });
+  applyVisibility();
+  updateLegend();
+}
+
+function setStatusFilter(val) {
+  statusFilter = val;
+  buildAll();
+  updateInfoPanel();
+}
+
+
+function setChoroLayer(key) {
+  // no longer called from UI — kept for programmatic use
+  activeChoroKey = key;
+  applyVisibility();
+  updateLegend();
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// STATS / INFO
+// ────────────────────────────────────────────────────────────────────────────
+
+function updateVisible() {
+  // kept for compatibility — sidebar stats box removed
+}
+
+function updateHeaderStats() {
+  const total  = allRecords.length;
+  const mapped = allRecords.filter(r=>r.latitude&&r.longitude).length;
+  const states = new Set(allRecords.map(r=>r.state).filter(Boolean)).size;
+  const fdi    = allRecords.filter(r=>r.fdi_source_country).length;
+  document.getElementById('hs-records').textContent = total;
+  document.getElementById('hs-mapped').textContent  = mapped;
+  document.getElementById('hs-states').textContent  = states;
+}
+
+
+function updateInfoPanel() {
+  let count = 0;
+  Object.keys(LAYER_CFG).forEach(k => {
+    if (activeLayerKey === 'all' || activeLayerKey === k) {
+      const pl = pointLayers[k];
+      count += (pl && pl.getLayers ? pl.getLayers().length : 0);
+    }
+  });
+  const rc = document.getElementById('record-count');
+  if (rc) rc.textContent = count;
+
+  let html='';
+  Object.keys(LAYER_CFG).forEach(k=>{
+    const cfg = LAYER_CFG[k];
+    const visible = (activeLayerKey === 'all' || activeLayerKey === k);
+    const mapped = cfg.data ? cfg.data.filter(r=>r.latitude&&r.longitude).length : 0;
+    html+=`<div class="ip-row" style="opacity:${visible?1:0.3}">
+      <div class="ip-dot" style="background:${visible?cfg.color:'#cbd5e1'}"></div>
+      <span class="ip-lbl">${cfg.icon} ${cfg.label}</span>
+      <span class="ip-cnt">${mapped}</span>
+    </div>`;
+  });
+  document.getElementById('info-panel-content').innerHTML = html;
+  updateLegend();
+}
+
+// ── Point marker legend definitions per sector ────────────────────────────
+const POINT_LEGENDS = {
+  solar: [
+    { color:'#22C55E', label:'Operational' },
+    { color:'#FBBF24', label:'Announced' },
+    { color:'#F97316', label:'Under Construction' },
+    { color:'#A78BFA', label:'Planned' },
+    { color:'#6B7280', label:'Unknown status' },
+  ],
+  hydrogen: [
+    { color:'#22C55E', label:'Operational' },
+    { color:'#FBBF24', label:'Announced' },
+    { color:'#F97316', label:'Under Construction' },
+    { color:'#A78BFA', label:'Planned' },
+    { color:'#6B7280', label:'Unknown status' },
+  ],
+  evs: [
+    { color:'#10B981', size:14, label:'2-Wheeler manufacturer' },
+    { color:'#34D399', size:11, label:'3-Wheeler manufacturer' },
+    { color:'#6EE7B7', size:10, label:'4-Wheeler / Car manufacturer' },
+    { color:'#059669', size:16, label:'Bus / Commercial vehicle manufacturer' },
+    { color:'#047857', size:9,  label:'Battery Pack / Component manufacturer' },
+    { color:'#6B7280', size:9,  label:'Other' },
+  ],
+  wind: [
+    { color:'#8B5CF6', label:'Nacelle manufacturer' },
+    { color:'#A78BFA', label:'Blade / Tower manufacturer' },
+    { color:'#C4B5FD', label:'Other wind component' },
+  ],
+  battery: [
+    { color:'#F97316', label:'Lithium-ion / Advanced chemistry' },
+    { color:'#FB923C', label:'Lead-acid battery' },
+    { color:'#FED7AA', label:'Other / Unknown battery type' },
+  ],
+  steel: [
+    { color:'#EF4444', label:'Announced / Planned facility' },
+    { color:'#9CA3AF', label:'Location undisclosed' },
+  ],
+};
+
+function updateLegend() {
+  const key = (activeLayerKey === 'all') ? null : activeLayerKey;
+  const showPoints = displayMode === 'points' || displayMode === 'both';
+  const showChoro  = displayMode === 'choropleth' || displayMode === 'both';
+
+  // ── Points legend ──────────────────────────────────────────────────────
+  const ptEl = document.getElementById('legend-points');
+  if (ptEl) {
+    if (!showPoints) {
+      ptEl.innerHTML = '<div style="font-size:10px;color:#cbd5e1;font-style:italic">Not shown in current view</div>';
+    } else if (!key) {
+      // All sectors — one dot per sector
+      ptEl.innerHTML = Object.keys(LAYER_CFG).map(k => {
+        const cfg = LAYER_CFG[k];
+        return `<div class="legend-row"><div class="legend-dot" style="background:${cfg.color}"></div>${cfg.icon} ${cfg.label}</div>`;
+      }).join('');
+    } else {
+      const items = POINT_LEGENDS[key] || [];
+      ptEl.innerHTML = items.map(item => {
+        const sz = item.size || 10;
+        return `<div class="legend-row"><div class="legend-dot" style="background:${item.color};width:${sz}px;height:${sz}px;flex-shrink:0"></div>${item.label}</div>`;
+      }).join('');
+    }
+  }
+
+  // ── State heatmap legend ───────────────────────────────────────────────
+  const stEl = document.getElementById('legend-states');
+  if (stEl) {
+    const choroKey = key || activeChoroKey;
+    if (!showChoro) {
+      stEl.innerHTML = '<div style="font-size:10px;color:#cbd5e1;font-style:italic">Not shown in current view</div>';
+    } else {
+      const cfg  = LAYER_CFG[choroKey];
+      const ramp = CHORO_RAMPS[choroKey];
+      const maxV = STATE_MAX[choroKey] || 1;
+      const mid  = Math.round(maxV / 2);
+      stEl.innerHTML = `
+        <div style="font-size:10px;color:#64748b;margin-bottom:6px">${cfg.icon} ${cfg.label} — number of assets per state</div>
+        <div style="display:flex;border-radius:4px;overflow:hidden;margin-bottom:4px">
+          ${ramp.map(c=>`<div style="flex:1;height:14px;background:${c}"></div>`).join('')}
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:#94a3b8">
+          <span>0 assets</span><span>${mid} assets</span><span>${maxV} assets</span>
+        </div>
+        <div style="font-size:10px;color:#94a3b8;margin-top:6px">
+          <span style="display:inline-block;width:12px;height:12px;background:#F1F5F9;border:1px solid #e2e8f0;border-radius:2px;vertical-align:middle;margin-right:5px"></span>No data
+        </div>`;
+    }
+  }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// SEARCH
+// ────────────────────────────────────────────────────────────────────────────
+
+function initSearch() {
+  const input = document.getElementById('search-input');
+  const box   = document.getElementById('search-results');
+
+  input.addEventListener('input', () => {
+    const q = input.value.trim().toLowerCase();
+    if (q.length < 2) { box.style.display='none'; return; }
+    const hits = allRecords.filter(r=>
+      r.latitude && r.longitude && (
+        (r.company||'').toLowerCase().includes(q) ||
+        (r.city||'').toLowerCase().includes(q) ||
+        (r.state||'').toLowerCase().includes(q)
+      )
+    ).slice(0,10);
+    if (!hits.length) { box.style.display='none'; return; }
+    box.innerHTML = hits.map(r=>{
+      const cfg = Object.values(LAYER_CFG).find(c=>c.data&&c.data.includes(r));
+      return `<div class="search-item" onclick="flyTo(${r.latitude},${r.longitude},'${(r.company||'').replace(/'/g,"\\'")}')">
+        <strong>${r.company}</strong>
+        <div class="search-sector">${cfg?cfg.label:''} · ${[r.city,r.state].filter(Boolean).join(', ')}</div>
+      </div>`;
+    }).join('');
+    box.style.display = 'block';
+  });
+
+  document.addEventListener('click', e=>{
+    if (!e.target.closest('#search-bar')&&!e.target.closest('#search-results')) box.style.display='none';
+  });
+}
+
+function flyTo(lat, lon, name) {
+  document.getElementById('search-results').style.display='none';
+  document.getElementById('search-input').value = name;
+  map.flyTo([lat,lon], 10, {duration:1.2});
+}
+</script>
+
+</body>
+</html>
