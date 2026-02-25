@@ -3,7 +3,7 @@
 
 An interactive GIS platform mapping green industrial assets across India — solar manufacturing, electric vehicles, wind energy, battery storage, green steel, and green hydrogen.
 
-Built by the **Net Zero Industrial Policy Lab (NZIPL)** at Johns Hopkins University / Tecnológico de Monterrey.
+Built by the **Net Zero Industrial Policy Lab (NZIPL)** at Johns Hopkins University
 
 ---
 
